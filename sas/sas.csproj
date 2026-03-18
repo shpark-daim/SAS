@@ -6,6 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	<NoWarn>$(NoWarn);CA1873</NoWarn>
+	<Authors>DAIM</Authors>
+	<Company>DAIM</Company>
+	<Version>0.0.2</Version>
   </PropertyGroup>
 
   <ItemGroup>
