@@ -83,7 +83,7 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
         }
         switch (status.Status) {
             case Status.NEW:
-                var key = new DetectionMapKey(status.ChannelId, _options.ReceivableRoi ? status.RoiId : "OHT1", status.EventType);
+                var key = new DetectionMapKey(status.ChannelId, _options.ReceivableRoi ? status.RoiId! : "OHT1", status.EventType);
                 if (_detectionMapService.GetDetectionMap(key, out DetectionMap? dm) && dm is { }) {
                     var pausObjs = _safetyStateManager.OnDetected(dm);
                     foreach (var segment in pausObjs.SegmentIds) await _connectionService.ModifySegment(segment, true, ct);
@@ -95,7 +95,7 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
             case Status.IN_PROGRESS:
                 break;
             case Status.FINISHED:
-                var dmKey = new DetectionMapKey(status.ChannelId, _options.ReceivableRoi ? status.RoiId : "OHT1", status.EventType);
+                var dmKey = new DetectionMapKey(status.ChannelId, _options.ReceivableRoi ? status.RoiId! : "OHT1", status.EventType);
                 if (_detectionMapService.GetDetectionMap(dmKey, out DetectionMap? dmObj) && dmObj is { })
                 {
                     var resumeObjs = _safetyStateManager.OnCleared(dmObj);

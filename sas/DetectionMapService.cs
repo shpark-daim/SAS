@@ -25,7 +25,7 @@ public class DetectionMapService : IDetectionMapService {
         _logger = logger;
         _options = generalOptions.Value;
         var channels = JsonSerializer.Deserialize<ChannelConfig[]>(
-            File.ReadAllText(_options.ChannelConfigPath)!);
+            File.ReadAllText(_options.ChannelConfigPath))!;
 
         var rois = JsonSerializer.Deserialize<RoiConfig[]>(
             File.ReadAllText(_options.RoiConfigPath))!.ToDictionary(r => r.Roi);
