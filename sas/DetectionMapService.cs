@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Collections.Immutable;
 using System.Data;
 using System.Text.Json;
@@ -15,17 +16,19 @@ public interface IDetectionMapService {
 
 public class DetectionMapService : IDetectionMapService {
     private readonly IMapService _mapService;
+    private readonly GeneralOptions _options;
     private readonly ILogger<DetectionMapService> _logger;
 
-    public DetectionMapService(IMapService mapService, ILogger<DetectionMapService> logger) {
+    public DetectionMapService(IMapService mapService, IOptions<GeneralOptions> generalOptions, ILogger<DetectionMapService> logger) {
         _mapService = mapService;
         _mapService.OnInitialized += OnMapServiceInitialized;
         _logger = logger;
+        _options = generalOptions.Value;
         var channels = JsonSerializer.Deserialize<ChannelConfig[]>(
-            File.ReadAllText("channels.json"))!;
+            File.ReadAllText(_options.ChannelConfigPath)!);
 
         var rois = JsonSerializer.Deserialize<RoiConfig[]>(
-            File.ReadAllText("rois.json"))!.ToDictionary(r => r.Roi);
+            File.ReadAllText(_options.RoiConfigPath))!.ToDictionary(r => r.Roi);
 
         _detectionMaps = [.. channels
             .SelectMany(c => c.Rois.Select(roiId =>

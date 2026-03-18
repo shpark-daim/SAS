@@ -9,4 +9,10 @@ public class GeneralOptions {
 
     // MQTT
     public int ReconnectInterval { get; set; } = 5;
+
+    public bool ReceivableRoi { get; set; } = false;
+
+    public string ChannelConfigPath { get; set; } = "channels_default.json";
+
+    public string RoiConfigPath { get; set; } = "rois_default.json";
 }

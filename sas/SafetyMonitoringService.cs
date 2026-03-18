@@ -1,6 +1,7 @@
 ﻿using Daim.Xms.Common;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Threading.Channels;
 
 namespace sas;
@@ -20,12 +21,14 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
         SingleReader = true,
         SingleWriter = false,
     });
+    private readonly GeneralOptions _options;
 
     public SafetyMonitoringService(
         IConnectionService connectionService,
         IDetectionMapService detectionMapService,
         ISafetyMonitoringManager safetyStateManager,
         IVehicleService vehicleService,
+        IOptions<GeneralOptions> generalOptions,
         ILogger<SafetyMonitoringService> logger) {
         _connectionService = connectionService;
         _logger = logger;
@@ -34,6 +37,7 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
         _safetyStateManager = safetyStateManager;
         _vehicleService = vehicleService;
         _vehicleService.VehicleChanged += VehicleChangedEventHandler;
+        _options = generalOptions.Value;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken) {
@@ -70,13 +74,16 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
     }
 
     private async Task HandleScpStatus(ScpStatus status, CancellationToken ct) {
-        _logger.LogInformation("Received SCP Status: [{EventType}] RoiId = {RoiId}, Status={Status}, EventId={EventId}, Timestamp={Timestamp}",
-            status.EventType, status.RoiId, status.Status, status.EventId, status.Timestamp);
+        if (_options.ReceivableRoi) {
+            _logger.LogInformation("Received SCP Status: [{EventType}] RoiId = {RoiId}, Status={Status}, EventId={EventId}, Timestamp={Timestamp}",
+                status.EventType, status.RoiId, status.Status, status.EventId, status.Timestamp);
+        } else {
+            _logger.LogInformation("Received SCP Status: [{EventType}] Status={Status}, EventId={EventId}, Timestamp={Timestamp}",
+                status.EventType, status.Status, status.EventId, status.Timestamp);
+        }
         switch (status.Status) {
             case Status.NEW:
-                _logger.LogInformation("Event started: {EventType} as {RoiId}", status.EventType, status.RoiId);
-                if (status.EventType == EventType.HelmetMissing) return;
-                var key = new DetectionMapKey(status.ChannelId, status.RoiId, status.EventType);
+                var key = new DetectionMapKey(status.ChannelId, _options.ReceivableRoi ? status.RoiId : "OHT1", status.EventType);
                 if (_detectionMapService.GetDetectionMap(key, out DetectionMap? dm) && dm is { }) {
                     var pausObjs = _safetyStateManager.OnDetected(dm);
                     foreach (var segment in pausObjs.SegmentIds) await _connectionService.ModifySegment(segment, true, ct);
@@ -88,8 +95,7 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
             case Status.IN_PROGRESS:
                 break;
             case Status.FINISHED:
-                _logger.LogInformation("Event finished: {EventType} as {RoiId}", status.EventType, status.RoiId);
-                var dmKey = new DetectionMapKey(status.ChannelId, status.RoiId, status.EventType);
+                var dmKey = new DetectionMapKey(status.ChannelId, _options.ReceivableRoi ? status.RoiId : "OHT1", status.EventType);
                 if (_detectionMapService.GetDetectionMap(dmKey, out DetectionMap? dmObj) && dmObj is { })
                 {
                     var resumeObjs = _safetyStateManager.OnCleared(dmObj);

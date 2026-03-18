@@ -1,0 +1,8 @@
+[General]
+ReceivableRoi = false
+ChannelConfigPath = "channels.json"
+RoiConfigPath = "rois.json"
+
+#ReceivableRoi = true
+#ChannelConfigPath = "channels_roi.json"
+#RoiConfigPath = "rois_roi.json"
