@@ -27,15 +27,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="rois_default.json">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-      </None>
-    <None Update="channels.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="rois.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <EditorConfigFiles Remove="C:\Project\기타\SAS\sas\.editorconfig" />
   </ItemGroup>
 
@@ -44,9 +35,37 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="channels.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="channels_roi.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="channels_roi_oht.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
     <None Update="channels_default.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="rois.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="rois_roi.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="rois_oht.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="rois_default.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="sas.toml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
+
+	<PropertyGroup>
+		<DebugType>none</DebugType>
+	</PropertyGroup>
 
 </Project>
