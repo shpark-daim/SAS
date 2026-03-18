@@ -1,0 +1,52 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+	<NoWarn>$(NoWarn);CA1873</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Daim.Serilog.Extensions" Version="2.1.0" />
+    <PackageReference Include="Daim.Xms.Common" Version="8.8.0" />
+    <PackageReference Include="Daim.Xms.DataServices.Client.MapService" Version="2.2.0" />
+    <PackageReference Include="Daim.Xms.DataServices.Client.VehicleService" Version="3.1.0" />
+    <PackageReference Include="Daim.Xms.GraphQLClient" Version="5.5.0" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.5" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.5" />
+    <PackageReference Include="MQTTnet" Version="5.1.0.1559" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Async" Version="2.1.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageReference Include="Serilog.Sinks.Seq" Version="9.0.0" />
+    <PackageReference Include="Tomlyn" Version="0.20.0" />
+    <PackageReference Include="Tomlyn.Extensions.Configuration" Version="1.0.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="rois_default.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+      </None>
+    <None Update="channels.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="rois.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <EditorConfigFiles Remove="C:\Project\기타\SAS\sas\.editorconfig" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="C:\Project\기타\SAS\sas\.editorconfig" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="channels_default.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>
