@@ -1,6 +1,6 @@
 [
   {
     "channel": "OHT_1",
-    "rois": [ "OHT1" ]
+    "rois": [ "OHT1", "CTT1" ]
   }
 ]

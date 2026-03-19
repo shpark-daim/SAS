@@ -109,6 +109,14 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
         }
     }
 
+    private DetectionMap[] GetDetectionMaps(ScpStatus status) {
+        if (_options.ReceivableRoi) {
+            return _detectionMapService.GetDetectionMap(
+                new DetectionMapKey(status.ChannelId, status.RoiId!, status.EventType), out var dm) && dm is { }
+                ? [dm] : [];
+        }
+        return _detectionMapService.GetDetectionMaps(status.ChannelId, status.EventType);
+    }
     private void HandleVehicleChangedEvent(ChangedEvent<Vehicle> e) {
         var now = e.New;
         var old = e.Old;

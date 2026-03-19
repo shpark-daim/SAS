@@ -9,6 +9,7 @@ namespace sas;
 
 public interface IDetectionMapService {
     bool GetDetectionMap(DetectionMapKey key, out DetectionMap? map);
+    DetectionMap[] GetDetectionMaps(string channelId, EventType eventType);
     bool IsVehicleRegistered(string vehId);
     void UpdateVehicleRegistration(string vehId, string nextNode, ImmutableList<string> path);
     void UnRegisterVehicle(string vehId);
@@ -59,6 +60,9 @@ public class DetectionMapService : IDetectionMapService {
         map = _detectionMaps.FirstOrDefault(dm => dm.Key == key);
         return map is not null;
     }
+
+    public DetectionMap[] GetDetectionMaps(string channelId, EventType eventType) =>
+        _detectionMaps.Where(dm => dm.ChannelId == channelId && dm.EventType == eventType).ToArray();
 
     public bool IsVehicleRegistered(string vehId) => _registeredVehicles.Contains(vehId);
 
