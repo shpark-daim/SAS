@@ -1,4 +1,4 @@
-﻿using Daim.Xms.Common;
+using Daim.Xms.Common;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -22,6 +22,10 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
         SingleWriter = false,
     });
     private readonly GeneralOptions _options;
+
+    private readonly Dictionary<DetectionMapKey, CancellationTokenSource> _pendingFinish = [];
+    private readonly Lock _pendingLock = new();
+    private record DwellFinishedEvent(DetectionMap DetectionMap, DetectionMapKey Key, CancellationTokenSource Cts);
 
     public SafetyMonitoringService(
         IConnectionService connectionService,
@@ -66,6 +70,7 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
             var bufferedEvent = events.Dequeue();
             switch (bufferedEvent) {
                 case ScpStatus e: await HandleScpStatus(e, ct); break;
+                case DwellFinishedEvent e: await HandleDwellFinished(e, ct); break;
                 case ChangedEvent<Vehicle> e: HandleVehicleChangedEvent(e); break;
                 default:
                     break;
@@ -77,14 +82,16 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
         if (_options.ReceivableRoi) {
             _logger.LogInformation("Received SCP Status: [{EventType}] RoiId = {RoiId}, Status={Status}, EventId={EventId}, Timestamp={Timestamp}",
                 status.EventType, status.RoiId, status.Status, status.EventId, status.Timestamp);
-        } else {
+        }
+        else {
             _logger.LogInformation("Received SCP Status: [{EventType}] Status={Status}, EventId={EventId}, Timestamp={Timestamp}",
                 status.EventType, status.Status, status.EventId, status.Timestamp);
         }
         switch (status.Status) {
             case Status.NEW:
-                var key = new DetectionMapKey(status.ChannelId, _options.ReceivableRoi ? status.RoiId! : "OHT1", status.EventType);
-                if (_detectionMapService.GetDetectionMap(key, out DetectionMap? dm) && dm is { }) {
+                var maps = GetDetectionMaps(status);
+                foreach (var dm in maps) {
+                    CancelPendingFinish(dm.Key);
                     var pausObjs = _safetyStateManager.OnDetected(dm);
                     foreach (var segment in pausObjs.SegmentIds) await _connectionService.ModifySegment(segment, true, ct);
                     foreach (var port in pausObjs.PortIds) await _connectionService.ModifyPort(port, true, ct);
@@ -95,15 +102,13 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
             case Status.IN_PROGRESS:
                 break;
             case Status.FINISHED:
-                var dmKey = new DetectionMapKey(status.ChannelId, _options.ReceivableRoi ? status.RoiId! : "OHT1", status.EventType);
-                if (_detectionMapService.GetDetectionMap(dmKey, out DetectionMap? dmObj) && dmObj is { })
-                {
-                    var resumeObjs = _safetyStateManager.OnCleared(dmObj);
-                    foreach (var segment in resumeObjs.SegmentIds) await _connectionService.ModifySegment(segment, false, ct);
-                    foreach (var port in resumeObjs.PortIds) await _connectionService.ModifyPort(port, false, ct);
-                    await _connectionService.ResetVehicle(resumeObjs.VehicleIds);
-                    await _connectionService.AutoVehicle(resumeObjs.VehicleIds);
-                    foreach (var robot in resumeObjs.RobotIds) await _connectionService.UpdateEquipment(robot, false);
+                foreach (var dmObj in GetDetectionMaps(status)) {
+                    if (_options.DwellTime <= 0) {
+                        await ExecuteFinished(dmObj, ct);
+                    }
+                    else {
+                        ScheduleFinished(dmObj, dmObj.Key, ct);
+                    }
                 }
                 break;
         }
@@ -117,6 +122,68 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
         }
         return _detectionMapService.GetDetectionMaps(status.ChannelId, status.EventType);
     }
+
+    private void CancelPendingFinish(DetectionMapKey key) {
+        lock (_pendingLock) {
+            if (!_pendingFinish.TryGetValue(key, out var cts)) return;
+            _logger.LogInformation("Dwell: NEW received within dwell window — cancelling pending FINISHED for [{EventType}] Channel={ChannelId} Roi={RoI}",
+                key.EventType, key.ChannelId, key.RoI);
+            cts.Cancel();
+            cts.Dispose();
+            _pendingFinish.Remove(key);
+        }
+    }
+
+    private void ScheduleFinished(DetectionMap dmObj, DetectionMapKey dmKey, CancellationToken serviceCt) {
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(serviceCt);
+        lock (_pendingLock) {
+            // 기존 타이머가 있으면 교체 (연속 FINISHED 방어)
+            if (_pendingFinish.TryGetValue(dmKey, out var existing)) {
+                existing.Cancel();
+                existing.Dispose();
+            }
+            _pendingFinish[dmKey] = cts;
+        }
+
+        _logger.LogInformation("Dwell: FINISHED received — scheduling execution in {DwellTime}s for [{EventType}] Channel={ChannelId} Roi={RoI}",
+            _options.DwellTime, dmKey.EventType, dmKey.ChannelId, dmKey.RoI);
+
+        _ = Task.Run(async () => {
+            try {
+                await Task.Delay(TimeSpan.FromSeconds(_options.DwellTime), cts.Token);
+                await WriteChannelAsync(new DwellFinishedEvent(dmObj, dmKey, cts));
+            }
+            catch (OperationCanceledException) {
+                // NEW 이벤트로 취소됨
+            }
+        }, CancellationToken.None);
+    }
+
+    private async Task HandleDwellFinished(DwellFinishedEvent e, CancellationToken ct) {
+        // 본인 CTS가 맞는지 확인 (중복 방지)
+        lock (_pendingLock) {
+            if (!_pendingFinish.TryGetValue(e.Key, out var current) || !ReferenceEquals(current, e.Cts)) {
+                e.Cts.Dispose();
+                return;
+            }
+            _pendingFinish.Remove(e.Key);
+        }
+        e.Cts.Dispose();
+
+        _logger.LogInformation("Dwell: Executing FINISHED after dwell for [{EventType}] Channel={ChannelId} Roi={RoI}",
+            e.Key.EventType, e.Key.ChannelId, e.Key.RoI);
+        await ExecuteFinished(e.DetectionMap, ct);
+    }
+
+    private async Task ExecuteFinished(DetectionMap dmObj, CancellationToken ct) {
+        var resumeObjs = _safetyStateManager.OnCleared(dmObj);
+        foreach (var segment in resumeObjs.SegmentIds) await _connectionService.ModifySegment(segment, false, ct);
+        foreach (var port in resumeObjs.PortIds) await _connectionService.ModifyPort(port, false, ct);
+        await _connectionService.ResetVehicle(resumeObjs.VehicleIds);
+        await _connectionService.AutoVehicle(resumeObjs.VehicleIds);
+        foreach (var robot in resumeObjs.RobotIds) await _connectionService.UpdateEquipment(robot, false);
+    }
+
     private void HandleVehicleChangedEvent(ChangedEvent<Vehicle> e) {
         var now = e.New;
         var old = e.Old;
