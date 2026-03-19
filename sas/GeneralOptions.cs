@@ -12,7 +12,7 @@ public class GeneralOptions {
 
     public bool ReceivableRoi { get; set; } = false;
 
-    public string ChannelConfigPath { get; set; } = "channels_default.json";
+    public string ChannelConfigPath { get; set; } = "config/channels_default.json";
 
-    public string RoiConfigPath { get; set; } = "rois_default.json";
+    public string RoiConfigPath { get; set; } = "config/rois_default.json";
 }

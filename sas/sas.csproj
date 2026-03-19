@@ -38,28 +38,13 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="channels.json">
+    <None Update="config\*.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
-    <None Update="channels_roi.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="channels_roi_oht.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="channels_default.json">
+    <None Update="config\channels_default.json">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
-    <None Update="rois.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="rois_roi.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="rois_oht.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="rois_default.json">
+    <None Update="config\rois_default.json">
       <CopyToOutputDirectory>Never</CopyToOutputDirectory>
     </None>
     <None Update="sas.toml">

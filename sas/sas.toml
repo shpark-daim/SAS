@@ -1,8 +1,8 @@
 [General]
 ReceivableRoi = false
-ChannelConfigPath = "channels.json"
-RoiConfigPath = "rois.json"
+ChannelConfigPath = "config/channels.json"
+RoiConfigPath = "config/rois.json"
 
 #ReceivableRoi = true
-#ChannelConfigPath = "channels_roi.json"
-#RoiConfigPath = "rois_roi.json"
+#ChannelConfigPath = "config/channels_roi.json"
+#RoiConfigPath = "config/rois_roi.json"
