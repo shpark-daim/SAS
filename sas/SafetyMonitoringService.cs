@@ -179,9 +179,10 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
         var resumeObjs = _safetyStateManager.OnCleared(dmObj);
         foreach (var segment in resumeObjs.SegmentIds) await _connectionService.ModifySegment(segment, false, ct);
         foreach (var port in resumeObjs.PortIds) await _connectionService.ModifyPort(port, false, ct);
-        await _connectionService.ResetVehicle(resumeObjs.VehicleIds);
-        await _connectionService.AutoVehicle(resumeObjs.VehicleIds);
         foreach (var robot in resumeObjs.RobotIds) await _connectionService.UpdateEquipment(robot, false);
+        await _connectionService.ResetVehicle(resumeObjs.VehicleIds);
+        await Task.Delay(1000, ct); // 차량 상태가 ESTOP에서 RESET으로 변경되는 것을 보장하기 위한 지연);
+        await _connectionService.AutoVehicle(resumeObjs.VehicleIds);
     }
 
     private void HandleVehicleChangedEvent(ChangedEvent<Vehicle> e) {
