@@ -20,4 +20,8 @@ public class GeneralOptions {
     // If a NEW event arrives within the dwell window, the pending FINISHED is cancelled.
     // Set to 0 to disable (execute FINISHED immediately).
     public int DwellTime { get; set; } = 0;
+
+    // 복구 완료(Auto 요청) 후 프로그램을 종료하기까지 대기 시간 (초 단위).
+    // 0으로 설정하면 종료하지 않음.
+    public int TimeToKillProgramAfterRecovery { get; set; } = 0;
 }

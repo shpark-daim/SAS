@@ -16,6 +16,7 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
     private readonly IDetectionMapService _detectionMapService;
     private readonly ISafetyMonitoringManager _safetyStateManager;
     private readonly IVehicleService _vehicleService;
+    private readonly IHostApplicationLifetime _appLifetime;
     private readonly Channel<object> _eventChannel = Channel.CreateUnbounded<object>(new UnboundedChannelOptions {
         AllowSynchronousContinuations = false,
         SingleReader = true,
@@ -32,6 +33,7 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
         IDetectionMapService detectionMapService,
         ISafetyMonitoringManager safetyStateManager,
         IVehicleService vehicleService,
+        IHostApplicationLifetime appLifetime,
         IOptions<GeneralOptions> generalOptions,
         ILogger<SafetyMonitoringService> logger) {
         _connectionService = connectionService;
@@ -41,6 +43,7 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
         _safetyStateManager = safetyStateManager;
         _vehicleService = vehicleService;
         _vehicleService.VehicleChanged += VehicleChangedEventHandler;
+        _appLifetime = appLifetime;
         _options = generalOptions.Value;
     }
 
@@ -183,6 +186,15 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
         await _connectionService.ResetVehicle(resumeObjs.VehicleIds);
         await Task.Delay(1000, ct); // 차량 상태가 ESTOP에서 RESET으로 변경되는 것을 보장하기 위한 지연);
         await _connectionService.AutoVehicle(resumeObjs.VehicleIds);
+
+        if (_options.TimeToKillProgramAfterRecovery > 0) {
+            _logger.LogInformation("Recovery complete. Program will exit in {Seconds}s.", _options.TimeToKillProgramAfterRecovery);
+            _ = Task.Run(async () => {
+                await Task.Delay(TimeSpan.FromSeconds(_options.TimeToKillProgramAfterRecovery));
+                _logger.LogInformation("Stopping program after recovery.");
+                _appLifetime.StopApplication();
+            });
+        }
     }
 
     private void HandleVehicleChangedEvent(ChangedEvent<Vehicle> e) {

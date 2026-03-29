@@ -3,6 +3,7 @@ ReceivableRoi = false
 DwellTime = 10
 ChannelConfigPath = "config/channels.json"
 RoiConfigPath = "config/rois.json"
+TimeToKillProgramAfterRecovery = 0
 
 #ReceivableRoi = true
 #ChannelConfigPath = "config/channels_roi.json"
