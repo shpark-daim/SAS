@@ -52,8 +52,11 @@
     </None>
   </ItemGroup>
 
-	<PropertyGroup>
-		<DebugType>none</DebugType>
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+		<DebugType>portable</DebugType>
 	</PropertyGroup>
 
+	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+		<DebugType>none</DebugType>
+	</PropertyGroup>
 </Project>
