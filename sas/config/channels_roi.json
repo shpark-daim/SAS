@@ -1,19 +1,19 @@
 [
   {
     "channel": "OHT_1",
-    "rois": [ "CTT00000", "CTT00001", "ITR00000", "ITR00001", "ITR00002" ]
+    "rois": [ "CTT00000", "CTT00001", "ITR00000", "ITR00001", "ITR00002", "DDD00001" ]
   },
   {
     "channel": "OHT_2",
-    "rois": [ "CTT00000", "ITR00001" ]
+    "rois": [ "CTT00000", "ITR00001", "DDD00001" ]
   },
   {
     "channel": "OHT_3",
-    "rois": [ "CTT00002", "ITR00000", "ITR00001", "ITR00002" ]
+    "rois": [ "CTT00002", "ITR00000", "ITR00001", "ITR00002", "DDD00001" ]
   },
   {
     "channel": "OHT_4",
-    "rois": [ "CTT00000", "CTT00001", "ITR00000", "ITR00001", "ITR00002" ]
+    "rois": [ "CTT00000", "CTT00001", "ITR00000", "ITR00001", "ITR00002", "DDD00001" ]
   },
   {
     "channel": "DS_1",

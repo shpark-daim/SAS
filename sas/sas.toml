@@ -1,9 +1,9 @@
 [General]
 ReceivableRoi = false
-ChannelConfigPath = "config/channels.json"
-RoiConfigPath = "config/rois.json"
+ChannelConfigPath = "config/channels_roi.json"
+RoiConfigPath = "config/rois_roi.json"
 PresetDwellTime = 3
-RecoveryDwellTime = 10
+RecoveryDwellTime = 5
 TimeToKillProgramAfterRecovery = 0
 
 #ReceivableRoi = true
