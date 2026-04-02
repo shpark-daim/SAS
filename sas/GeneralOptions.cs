@@ -16,12 +16,15 @@ public class GeneralOptions {
 
     public string RoiConfigPath { get; set; } = "config/rois_default.json";
 
-    // Dwell time in seconds. FINISHED event is delayed by this duration.
-    // If a NEW event arrives within the dwell window, the pending FINISHED is cancelled.
-    // Set to 0 to disable (execute FINISHED immediately).
-    public int DwellTime { get; set; } = 0;
+    // HelmetMissing/PersonIntrusion NEW 이벤트 페어링 대기 시간 (in seconds)
+    // 0 : 페어링하지 않음.
+    public int PresetDwellTime { get; set; } = 3;
 
-    // 복구 완료(Auto 요청) 후 프로그램을 종료하기까지 대기 시간 (초 단위).
-    // 0으로 설정하면 종료하지 않음.
+    // FINISHED 이벤트 지연 시간 (in seconds)
+    // 0 : 즉시 재개.
+    public int RecoveryDwellTime { get; set; } = 10;
+
+    // 복구 요청 후 프로그램을 종료하기까지 대기 시간 (in seconds)
+    // 0 : 종료하지 않음.
     public int TimeToKillProgramAfterRecovery { get; set; } = 0;
 }

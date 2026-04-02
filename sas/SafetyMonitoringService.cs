@@ -28,6 +28,14 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
     private readonly Lock _pendingLock = new();
     private record DwellFinishedEvent(DetectionMap DetectionMap, DetectionMapKey Key, CancellationTokenSource Cts);
 
+    // ChannelId별 preset 대기 상태 (채널당 최대 1개)
+    private record PresetWaiting(EventType ArrivedType, List<DetectionMap> Maps, CancellationTokenSource Cts);
+    private readonly Dictionary<string, PresetWaiting> _pendingPreset = []; // key: ChannelId
+    private readonly Lock _presetLock = new();
+
+    // OnDetected가 호출된 키 추적 (이벤트 채널 단일 reader이므로 lock 불필요)
+    private readonly HashSet<DetectionMapKey> _activatedKeys = [];
+
     public SafetyMonitoringService(
         IConnectionService connectionService,
         IDetectionMapService detectionMapService,
@@ -93,28 +101,104 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
         switch (status.Status) {
             case Status.NEW:
                 var maps = GetDetectionMaps(status);
-                foreach (var dm in maps) {
+                var mapsToActivate = ResolveMapsToActivate(status, [.. maps]);
+
+                foreach (var dm in mapsToActivate) {
                     CancelPendingFinish(dm.Key);
-                    var pausObjs = _safetyStateManager.OnDetected(dm);
-                    foreach (var segment in pausObjs.SegmentIds) await _connectionService.ModifySegment(segment, true, ct);
-                    foreach (var port in pausObjs.PortIds) await _connectionService.ModifyPort(port, true, ct);
-                    await _connectionService.EstopVehicle(pausObjs.VehicleIds);
-                    foreach (var robot in pausObjs.RobotIds) await _connectionService.UpdateEquipment(robot, true);
+                    await ActivateMap(dm, ct);
                 }
                 break;
+
+                List<DetectionMap> ResolveMapsToActivate(ScpStatus status, List<DetectionMap> maps) {
+                    if (status.EventType == EventType.HandDetected || _options.PresetDwellTime <= 0)
+                        return maps;
+
+                    lock (_presetLock) {
+                        if (_pendingPreset.TryGetValue(status.ChannelId, out var pending)) {
+                            pending.Cts.Cancel();
+                            if (pending.ArrivedType != status.EventType) {
+                                _pendingPreset.Remove(status.ChannelId);
+                                return [.. pending.Maps, .. maps];
+                            }
+                        }
+
+                        // 페어링 미성립 → 대기 등록
+                        StartPreset(status.ChannelId, status.EventType, [.. maps], ct);
+                        return [];
+                    }
+                }
             case Status.IN_PROGRESS:
                 break;
             case Status.FINISHED:
                 foreach (var dmObj in GetDetectionMaps(status)) {
-                    if (_options.DwellTime <= 0) {
+                    // 대기 중 Finished 수신 -> 페어링 취소 및 skip
+                    if (TryCancelPreset(dmObj.Key.EventType, status.ChannelId)) {
+                        _logger.LogInformation(
+                            "Preset: FINISHED received while waiting for pair — cancelling preset for [{EventType}] Channel={ChannelId}",
+                            dmObj.Key.EventType, status.ChannelId);
+                        continue;
+                    }
+
+                    if (!_activatedKeys.Contains(dmObj.Key)) continue;
+
+                    if (_options.RecoveryDwellTime <= 0)
                         await ExecuteFinished(dmObj, ct);
-                    }
-                    else {
+                    else
                         ScheduleFinished(dmObj, dmObj.Key, ct);
-                    }
                 }
                 break;
+
+                bool TryCancelPreset(EventType eventType, string channelId) {
+                    if (!IsPresetType(eventType) || _options.PresetDwellTime <= 0)
+                        return false;
+
+                    lock (_presetLock) {
+                        if (_pendingPreset.TryGetValue(channelId, out var pending)
+                            && pending.ArrivedType == eventType) {
+                            _pendingPreset.Remove(channelId);
+                            pending.Cts.Cancel();
+                            return true;
+                        }
+                    }
+                    return false;
+                }
         }
+    }
+
+    private static bool IsPresetType(EventType t) => t is EventType.HelmetMissing or EventType.PersonIntrusion;
+
+    private async Task ActivateMap(DetectionMap dm, CancellationToken ct) {
+        _activatedKeys.Add(dm.Key);
+        var pausObjs = _safetyStateManager.OnDetected(dm);
+        foreach (var segment in pausObjs.SegmentIds) await _connectionService.ModifySegment(segment, true, ct);
+        foreach (var port in pausObjs.PortIds) await _connectionService.ModifyPort(port, true, ct);
+        await _connectionService.EstopVehicle(pausObjs.VehicleIds);
+        foreach (var robot in pausObjs.RobotIds) await _connectionService.UpdateEquipment(robot, true);
+    }
+
+    private void StartPreset(string channelId, EventType eventType, List<DetectionMap> maps, CancellationToken serviceCt) {
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(serviceCt);
+        _pendingPreset[channelId] = new PresetWaiting(eventType, maps, cts);
+
+        _logger.LogInformation("Preset: [{EventType}] NEW received — waiting {PresetDwellTime}s for pair on Channel={ChannelId}",
+            eventType, _options.PresetDwellTime, channelId);
+
+        _ = Task.Run(async () => {
+            try {
+                await Task.Delay(TimeSpan.FromSeconds(_options.PresetDwellTime), cts.Token);
+                lock (_presetLock) {
+                    if (_pendingPreset.TryGetValue(channelId, out var current) && ReferenceEquals(current.Cts, cts)) {
+                        _pendingPreset.Remove(channelId);
+                    }
+                    else return;
+                }
+                _logger.LogInformation("Preset: [{EventType}] pair window expired on Channel={ChannelId} — no action taken",
+                    eventType, channelId);
+            }
+            catch (OperationCanceledException) {
+                // 페어 성립 또는 FINISHED로 취소됨
+            }
+        }, CancellationToken.None);
     }
 
     private DetectionMap[] GetDetectionMaps(ScpStatus status) {
@@ -140,20 +224,20 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
     private void ScheduleFinished(DetectionMap dmObj, DetectionMapKey dmKey, CancellationToken serviceCt) {
         var cts = CancellationTokenSource.CreateLinkedTokenSource(serviceCt);
         lock (_pendingLock) {
-            // 기존 타이머가 있으면 교체 (연속 FINISHED 방어)
-            if (_pendingFinish.TryGetValue(dmKey, out var existing)) {
-                existing.Cancel();
-                existing.Dispose();
+            // 이미 타이머가 있으면 첫 번째 기준 유지 (연속 FINISHED 무시)
+            if (_pendingFinish.ContainsKey(dmKey)) {
+                cts.Dispose();
+                return;
             }
             _pendingFinish[dmKey] = cts;
         }
 
-        _logger.LogInformation("Dwell: FINISHED received — scheduling execution in {DwellTime}s for [{EventType}] Channel={ChannelId} Roi={RoI}",
-            _options.DwellTime, dmKey.EventType, dmKey.ChannelId, dmKey.RoI);
+        _logger.LogInformation("Dwell: FINISHED received — scheduling execution in {RecoveryDwellTime}s for [{EventType}] Channel={ChannelId} Roi={RoI}",
+            _options.RecoveryDwellTime, dmKey.EventType, dmKey.ChannelId, dmKey.RoI);
 
         _ = Task.Run(async () => {
             try {
-                await Task.Delay(TimeSpan.FromSeconds(_options.DwellTime), cts.Token);
+                await Task.Delay(TimeSpan.FromSeconds(_options.RecoveryDwellTime), cts.Token);
                 await WriteChannelAsync(new DwellFinishedEvent(dmObj, dmKey, cts));
             }
             catch (OperationCanceledException) {
@@ -179,6 +263,7 @@ public class SafetyMonitoringService : BackgroundService, ISafetyMonitoringServi
     }
 
     private async Task ExecuteFinished(DetectionMap dmObj, CancellationToken ct) {
+        _activatedKeys.Remove(dmObj.Key);
         var resumeObjs = _safetyStateManager.OnCleared(dmObj);
         foreach (var segment in resumeObjs.SegmentIds) await _connectionService.ModifySegment(segment, false, ct);
         foreach (var port in resumeObjs.PortIds) await _connectionService.ModifyPort(port, false, ct);
