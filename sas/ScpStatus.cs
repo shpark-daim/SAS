@@ -9,13 +9,13 @@ public record ScpStatus(
     string EventId,
     string SiteId,
     string ChannelId,
-    string RoiId,
     [property: JsonConverter(typeof(DescriptionEnumConverter<EventType>))]
     EventType EventType,
     [property: JsonConverter(typeof(JsonStringEnumConverter<Status>))]
     Status Status,
     [property: JsonConverter(typeof(NanosecondsDateTimeOffsetConverter))]
-    DateTimeOffset Timestamp
+    DateTimeOffset Timestamp,
+    string? RoiId = null
     ) {
 
     public virtual bool Equals(ScpStatus? other) {

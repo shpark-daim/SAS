@@ -6,6 +6,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
 	<NoWarn>$(NoWarn);CA1873</NoWarn>
+	<Authors>DAIM</Authors>
+	<Company>DAIM</Company>
+	<Version>0.0.5</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -27,15 +30,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="rois_default.json">
-      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
-      </None>
-    <None Update="channels.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
-    <None Update="rois.json">
-      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-    </None>
     <EditorConfigFiles Remove="C:\Project\기타\SAS\sas\.editorconfig" />
   </ItemGroup>
 
@@ -44,9 +38,25 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Update="channels_default.json">
+    <None Update="config\*.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="config\channels_default.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="config\rois_default.json">
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </None>
+    <None Update="sas.toml">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 
+	<PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+		<DebugType>portable</DebugType>
+	</PropertyGroup>
+
+	<PropertyGroup Condition="'$(Configuration)' == 'Release'">
+		<DebugType>none</DebugType>
+	</PropertyGroup>
 </Project>

@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using System.Collections.Immutable;
 using System.Data;
 using System.Text.Json;
@@ -8,6 +9,7 @@ namespace sas;
 
 public interface IDetectionMapService {
     bool GetDetectionMap(DetectionMapKey key, out DetectionMap? map);
+    DetectionMap[] GetDetectionMaps(string channelId, EventType eventType);
     bool IsVehicleRegistered(string vehId);
     void UpdateVehicleRegistration(string vehId, string nextNode, ImmutableList<string> path);
     void UnRegisterVehicle(string vehId);
@@ -15,17 +17,19 @@ public interface IDetectionMapService {
 
 public class DetectionMapService : IDetectionMapService {
     private readonly IMapService _mapService;
+    private readonly GeneralOptions _options;
     private readonly ILogger<DetectionMapService> _logger;
 
-    public DetectionMapService(IMapService mapService, ILogger<DetectionMapService> logger) {
+    public DetectionMapService(IMapService mapService, IOptions<GeneralOptions> generalOptions, ILogger<DetectionMapService> logger) {
         _mapService = mapService;
         _mapService.OnInitialized += OnMapServiceInitialized;
         _logger = logger;
+        _options = generalOptions.Value;
         var channels = JsonSerializer.Deserialize<ChannelConfig[]>(
-            File.ReadAllText("channels.json"))!;
+            File.ReadAllText(_options.ChannelConfigPath))!;
 
         var rois = JsonSerializer.Deserialize<RoiConfig[]>(
-            File.ReadAllText("rois.json"))!.ToDictionary(r => r.Roi);
+            File.ReadAllText(_options.RoiConfigPath))!.ToDictionary(r => r.Roi);
 
         _detectionMaps = [.. channels
             .SelectMany(c => c.Rois.Select(roiId =>
@@ -56,6 +60,9 @@ public class DetectionMapService : IDetectionMapService {
         map = _detectionMaps.FirstOrDefault(dm => dm.Key == key);
         return map is not null;
     }
+
+    public DetectionMap[] GetDetectionMaps(string channelId, EventType eventType) =>
+        _detectionMaps.Where(dm => dm.ChannelId == channelId && dm.EventType == eventType).ToArray();
 
     public bool IsVehicleRegistered(string vehId) => _registeredVehicles.Contains(vehId);
 
